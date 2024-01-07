@@ -27,3 +27,14 @@ local-daemon $$ watch -t -x echo "this is gonna go away in 5 seconds (hopefully)
 sleep 5
 # local-daemon and watch -t -x should exit now
 ```
+
+## waitpid
+
+This repo also offers extra tool called `waitpid`. It does exactly what the name says.
+
+```bash
+echo "sleeping for 5 secs now"
+sleep 5 &
+waitpid $!
+echo "okay did we wait for the sleep properly?"
+```

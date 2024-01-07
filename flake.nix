@@ -37,14 +37,26 @@
       # package
       packages.default = local-daemon;
 
-      # nix run
-      apps.default = app [] "zig build run -- \"$@\"";
+      # nix run .#local-daemon
+      apps.local-daemon = app [] "zig build run-local-daemon -- \"$@\"";
 
-      # nix run .#test
-      apps.test = app [] ''
+      # nix run .#waitpid
+      apps.waitpid = app [] "zig build run-waitpid -- \"$@\"";
+
+      # nix run .#test-local-daemon
+      apps.test-local-daemon = app [] ''
         zig build
         ./zig-out/bin/local-daemon $$ watch -t -x echo "this is gonna go away in 5 seconds (hopefully)"
         sleep 5
+      '';
+
+      # nix run .#test-waitpid
+      apps.test-waitpid = app [] ''
+        zig build
+        echo "sleeping for 5 secs now"
+        sleep 5 &
+        ./zig-out/bin/waitpid $!
+        echo "okay did we wait for the sleep properly?"
       '';
 
       # nix run .#version
@@ -83,6 +95,17 @@
       ${project} \$\$ watch -t -x echo "this is gonna go away in 5 seconds (hopefully)"
       sleep 5
       # ${project} and watch -t -x should exit now
+      ```
+
+      ## waitpid
+
+      This repo also offers extra tool called `waitpid`. It does exactly what the name says.
+
+      ```bash
+      echo "sleeping for 5 secs now"
+      sleep 5 &
+      waitpid \$!
+      echo "okay did we wait for the sleep properly?"
       ```
       EOF
       '');

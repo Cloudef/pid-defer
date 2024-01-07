@@ -1,11 +1,14 @@
 const std = @import("std");
+const waitpid = @import("common.zig").waitpid;
 
 var CHILD: ?std.process.Child = null;
 
 fn signalHandler(signal: c_int) anyerror!void {
     if (CHILD) |*chld| {
         CHILD = null;
-        _ = chld.kill() catch {};
+        if (!waitpid(chld.id)) {
+            _ = chld.kill() catch {};
+        }
     }
     if (signal == std.os.SIG.HUP) {
         std.os.exit(@truncate(@as(c_uint, @bitCast(signal))));
@@ -26,13 +29,6 @@ fn sigact(comptime handler: fn (c_int) anyerror!void) std.os.Sigaction {
         .mask = std.os.empty_sigset,
         .flags = 0,
     };
-}
-
-fn waitpid(pid: std.process.Child.Id) !std.process.Child.Id {
-    var status: u32 = undefined;
-    const ret = @as(std.process.Child.Id, @truncate(@as(isize, @bitCast(std.os.system.waitpid(pid, &status, std.os.system.W.NOHANG)))));
-    if (ret == -1) return error.WaitPidFailed;
-    return ret;
 }
 
 pub fn main() !void {
@@ -66,7 +62,9 @@ pub fn main() !void {
     defer {
         if (CHILD) |_| {
             CHILD = null;
-            _ = chld.kill() catch {};
+            if (!waitpid(chld.id)) {
+                _ = chld.kill() catch {};
+            }
         }
     }
 
@@ -86,7 +84,7 @@ pub fn main() !void {
     while (nevents == 0) {
         nevents = std.os.linux.epoll_pwait(efd, events[0..], events.len, 0, null);
         for (events[0..nevents]) |ev| {
-            if (try waitpid(ev.data.fd) == ev.data.fd) {
+            if (waitpid(ev.data.fd)) {
                 // process closed
                 return;
             }
