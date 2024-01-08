@@ -9,7 +9,7 @@ pub fn build(b: *std.Build) void {
         file: []const u8,
     };
     const tools: []const Tool = &.{
-        .{ .name = "local-daemon", .file = "src/local-daemon.zig" },
+        .{ .name = "defer", .file = "src/defer.zig" },
         .{ .name = "reaper", .file = "src/reaper.zig" },
         .{ .name = "waitpid", .file = "src/waitpid.zig" },
     };

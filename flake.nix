@@ -27,18 +27,18 @@
         }) + "/bin/app";
       };
 
-      local-daemon = pkgs.stdenvNoCC.mkDerivation {
-        name = "local-daemon";
+      defer = pkgs.stdenvNoCC.mkDerivation {
+        name = "defer";
         version = "1.0.0";
         src = ./.;
         nativeBuildInputs = [ pkgs.zig.hook ];
       };
     in {
       # package
-      packages.default = local-daemon;
+      packages.default = defer;
 
-      # nix run .#local-daemon
-      apps.local-daemon = app [] "zig build run-local-daemon -- \"$@\"";
+      # nix run .#defer
+      apps.defer = app [] "zig build run-defer -- \"$@\"";
 
       # nix run .#reaper
       apps.reaper = app [] "zig build run-reaper -- \"$@\"";
@@ -46,17 +46,17 @@
       # nix run .#waitpid
       apps.waitpid = app [] "zig build run-waitpid -- \"$@\"";
 
-      # nix run .#test-local-daemon
-      apps.test-local-daemon = app [] ''
+      # nix run .#test-defer
+      apps.test-defer = app [] ''
         zig build
-        ./zig-out/bin/local-daemon $$ watch -t -x echo "this is gonna go away in 5 seconds (hopefully)"
+        ./zig-out/bin/defer $$ watch -t -x echo "this is gonna go away in 5 seconds (hopefully)"
         sleep 5
       '';
 
       # nix run .#test-reaper
       apps.test-reaper = app [pkgs.daemonize] ''
         zig build
-        ./zig-out/bin/local-daemon $$ ./zig-out/bin/reaper daemonize -o /dev/stdout "$(which watch)" -t -x echo "this is gonna go away in 5 seconds (hopefully)"
+        ./zig-out/bin/defer $$ ./zig-out/bin/reaper daemonize -o /dev/stdout "$(which watch)" -t -x echo "this is gonna go away in 5 seconds (hopefully)"
         sleep 5
       '';
 
@@ -74,12 +74,12 @@
 
       # nix run .#readme
       apps.readme = let
-        project = "local-daemon";
+        project = "pid-defer";
       in with pkgs; app [graphviz] (builtins.replaceStrings ["`"] ["\\`"] ''
       cat <<EOF
       # ${project}
 
-      Run processes that will be cleaned up when parent exits. (Linux only)
+      Run processes that will be cleaned up when other process exits. (Linux only)
 
       ---
 
@@ -93,18 +93,18 @@
       This project tries to solve that problem, acting as sort of local service / process handler.
 
       ```bash
-      local-daemon ppid my-command [args]
+      defer ppid my-command [args]
       ```
 
       > [!WARNING]
-      > It's possible for a race condition to occur if `ppid` dies and is replaced by other process with same `pid` before `local-daemon` calls `pidfd_open`.
+      > It's possible for a race condition to occur if `ppid` dies and is replaced by other process with same `pid` before `defer` calls `pidfd_open`.
 
       ### Example
 
       ```bash
-      local-daemon \$\$ watch -t -x echo "this is gonna go away in 5 seconds (hopefully)"
+      defer \$\$ watch -t -x echo "this is gonna go away in 5 seconds (hopefully)"
       sleep 5
-      # local-daemon and watch -t -x should exit now
+      # defer and watch -t -x should exit now
       ```
 
       ### Handling double forking processes
@@ -112,9 +112,9 @@
       When child double forks itself or spawns other children that might double fork, you can use the `reaper` binary to handle those.
 
       ```bash
-      local-daemon \$\$ reaper daemonize -o /dev/stdout "\$(which watch)" -t -x echo "this is gonna go away in 5 seconds (hopefully)"
+      defer \$\$ reaper daemonize -o /dev/stdout "\$(which watch)" -t -x echo "this is gonna go away in 5 seconds (hopefully)"
       sleep 5
-      # local-daemon, reaper and watch -t -x should exit now
+      # defer, reaper and watch -t -x should exit now
       ```
 
       ## waitpid
