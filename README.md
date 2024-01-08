@@ -18,7 +18,7 @@ local-daemon ppid my-command [args]
 ```
 
 > [!WARNING]
-> It's possible for a race condition to occur if `ppid` dies and is replaced by other process with same `pid` before local-daemon calls `pidfd_open`.
+> It's possible for a race condition to occur if `ppid` dies and is replaced by other process with same `pid` before `local-daemon` calls `pidfd_open`.
 
 ### Example
 
@@ -26,6 +26,16 @@ local-daemon ppid my-command [args]
 local-daemon $$ watch -t -x echo "this is gonna go away in 5 seconds (hopefully)"
 sleep 5
 # local-daemon and watch -t -x should exit now
+```
+
+### Handling double forking processes
+
+When child double forks itself or spawns other children that might double fork, you can use the `reaper` binary to handle those.
+
+```bash
+local-daemon $$ reaper daemonize -o /dev/stdout "$(which watch)" -t -x echo "this is gonna go away in 5 seconds (hopefully)"
+sleep 5
+# local-daemon, reaper and watch -t -x should exit now
 ```
 
 ## waitpid

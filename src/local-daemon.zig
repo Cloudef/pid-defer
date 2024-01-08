@@ -10,6 +10,7 @@ fn cleanupChild() void {
         const signals = .{ std.os.SIG.TERM, std.os.SIG.KILL };
         inline for (signals) |sig| {
             std.os.kill(chld, sig) catch return;
+            // TODO: custom timeout
             for (1..5) |_| {
                 if (waitpid(chld, false) == .nopid) return;
                 std.time.sleep(1e+9);
