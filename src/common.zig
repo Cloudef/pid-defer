@@ -32,3 +32,19 @@ pub fn waitpid(pid: std.process.Child.Id, blocking: bool) WaitPidResult {
     }
     return .noop;
 }
+
+pub fn sigact(comptime handler: fn (c_int) anyerror!void) std.os.Sigaction {
+    const wrapper = struct {
+        fn fun(sig: c_int) callconv(.C) void {
+            handler(sig) catch |err| {
+                std.log.err("error from signal handler: {}", .{err});
+                @panic("cannot continue");
+            };
+        }
+    };
+    return .{
+        .handler = .{ .handler = wrapper.fun },
+        .mask = std.os.empty_sigset,
+        .flags = 0,
+    };
+}

@@ -1,5 +1,27 @@
 const std = @import("std");
 const waitpid = @import("common.zig").waitpid;
+const sigact = @import("common.zig").sigact;
+
+var CHILD: ?std.process.Child.Id = null;
+
+fn cleanupChild() void {
+    if (CHILD) |chld| {
+        CHILD = null;
+        const signals = .{ std.os.SIG.TERM, std.os.SIG.KILL };
+        inline for (signals) |sig| {
+            std.os.kill(chld, sig) catch return;
+            for (1..5) |_| {
+                if (waitpid(chld, false) == .nopid) return;
+                std.time.sleep(1e+9);
+            }
+        }
+    }
+}
+
+fn signalHandler(signal: c_int) anyerror!void {
+    cleanupChild();
+    std.os.exit(@truncate(@as(c_uint, @bitCast(signal))));
+}
 
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
@@ -20,13 +42,16 @@ pub fn main() !void {
     if (ppid_fd == -1) return error.PidfdOpenFailed;
     defer std.os.close(ppid_fd);
 
-    if (std.os.errno(std.os.linux.syscall2(.setpgid, @bitCast(@as(isize, std.os.linux.getpid())), 0)) != .SUCCESS) {
-        return error.SetpgidFailed;
+    {
+        const signals = .{std.os.SIG.TERM, std.os.SIG.INT, std.os.SIG.QUIT, std.os.SIG.HUP};
+        var act = sigact(signalHandler);
+        inline for (signals) |sig| try std.os.sigaction(sig, &act, null);
     }
 
     var chld = std.process.Child.init(args[2..], allocator);
     _ = try chld.spawn();
-    defer std.os.kill(0, std.os.SIG.TERM) catch {};
+    CHILD = chld.id;
+    defer cleanupChild();
 
     const child_fd: std.os.pid_t = @bitCast(@as(u32, @truncate(std.os.linux.pidfd_open(chld.id, 0))));
     if (child_fd == -1) return error.PidfdOpenFailed;
