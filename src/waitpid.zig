@@ -26,7 +26,7 @@ pub fn main() !void {
         nevents = std.os.linux.epoll_pwait(efd, events[0..], events.len, 0, null);
         for (events[0..nevents]) |ev| {
             switch (waitpid(ev.data.fd, false)) {
-                .noop => {},
+                .noop, .alive => {},
                 .exited, .nopid => return,
             }
         }

@@ -7,6 +7,8 @@ pub const WaitPidResult = union (enum) {
     nopid: void,
     // child has exited cleanly
     exited: std.process.Child.Id,
+    // child still alive
+    alive: std.process.Child.Id,
 };
 
 pub fn waitpid(pid: std.process.Child.Id, blocking: bool) WaitPidResult {
@@ -21,8 +23,11 @@ pub fn waitpid(pid: std.process.Child.Id, blocking: bool) WaitPidResult {
             else => {},
         }
         const rpid: std.process.Child.Id = @truncate(@as(isize, @bitCast(ret)));
-        if (rpid != 0 and (std.os.linux.W.IFSIGNALED(status) or std.os.linux.W.IFEXITED(status))) {
-            return .{ .exited = rpid };
+        if (rpid != 0) {
+            if (std.os.linux.W.IFSIGNALED(status) or std.os.linux.W.IFEXITED(status)) {
+                return .{ .exited = rpid };
+            }
+            return .{ .alive = rpid };
         }
     }
     return .noop;
