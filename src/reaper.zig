@@ -2,27 +2,36 @@ const std = @import("std");
 const waitpid = @import("common.zig").waitpid;
 const sigact = @import("common.zig").sigact;
 
+fn killChildren(ttid: std.os.pid_t, signal: u8) !usize {
+    const max_path = std.fmt.comptimePrint("/proc/self/task/{}/children", .{std.math.maxInt(@TypeOf(ttid))});
+    var proc_path = std.BoundedArray(u8, max_path.len){};
+    try proc_path.writer().print("/proc/self/task/{}/children", .{ttid});
+    var file = try std.fs.openFileAbsolute(proc_path.constSlice(), .{.mode = .read_only});
+    defer file.close();
+    var reader = file.reader();
+    var nchild: usize = 0;
+    while (try reader.readUntilDelimiterOrEof(proc_path.slice(), ' ')) |buf| {
+        const pid = try std.fmt.parseInt(std.os.pid_t, buf, 10);
+        std.os.kill(pid, signal) catch {};
+        nchild += 1;
+    }
+    return nchild;
+}
+
 fn cleanupChildren() !void {
     const ttid = std.os.linux.gettid();
     var signal: u8 = std.os.SIG.TERM;
     again: {
-        const max_path = std.fmt.comptimePrint("/proc/self/task/{}/children", .{std.math.maxInt(@TypeOf(ttid))});
-        var proc_path = std.BoundedArray(u8, max_path.len){};
-        try proc_path.writer().print("/proc/self/task/{}/children", .{ttid});
-        var file = try std.fs.openFileAbsolute(proc_path.constSlice(), .{.mode = .read_only});
-        defer file.close();
-        var reader = file.reader();
-        while (try reader.readUntilDelimiterOrEof(proc_path.slice(), ' ')) |buf| {
-            const pid = try std.fmt.parseInt(std.os.pid_t, buf, 10);
-            std.os.kill(pid, signal) catch {};
-        }
-        if (signal == std.os.SIG.KILL) {
-            // give up
-            return;
-        }
         // TODO: custom timeout
         for (1..5) |_| {
-            if (waitpid(-1, false) == .nopid) return;
+            if (try killChildren(ttid, signal) == 0) {
+                // we are done
+                return;
+            }
+            if (signal == std.os.SIG.KILL) {
+                // give up
+                return;
+            }
             std.time.sleep(1e+9);
         }
         signal = std.os.SIG.KILL;
