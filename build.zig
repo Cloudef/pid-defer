@@ -19,6 +19,7 @@ pub fn build(b: *std.Build) void {
             .root_source_file = .{ .path = tool.file },
             .target = target,
             .optimize = optimize,
+            .single_threaded = true,
         });
         b.installArtifact(main_exe);
         const main_run = b.addRunArtifact(main_exe);
