@@ -20,6 +20,10 @@ pub fn main() !void {
     if (ppid_fd == -1) return error.PidfdOpenFailed;
     defer std.os.close(ppid_fd);
 
+    if (std.os.errno(std.os.linux.syscall2(.setpgid, @bitCast(@as(isize, std.os.linux.getpid())), 0)) != .SUCCESS) {
+        return error.SetpgidFailed;
+    }
+
     var chld = std.process.Child.init(args[2..], allocator);
     _ = try chld.spawn();
     defer std.os.kill(0, std.os.SIG.TERM) catch {};
