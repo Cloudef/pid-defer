@@ -16,16 +16,18 @@ pub fn main() !void {
     defer std.os.close(pid_fd);
 
     const efd = try std.os.epoll_create1(std.os.linux.EPOLL.CLOEXEC);
+    defer std.os.close(efd);
     var iev: std.os.linux.epoll_event = .{ .events = std.os.linux.EPOLL.IN, .data = .{ .fd = pid } };
     try std.os.epoll_ctl(efd, std.os.linux.EPOLL.CTL_ADD, pid_fd, &iev);
+
     var events: [1]std.os.linux.epoll_event = undefined;
     var nevents: usize = 0;
     while (nevents == 0) {
         nevents = std.os.linux.epoll_pwait(efd, events[0..], events.len, 0, null);
         for (events[0..nevents]) |ev| {
-            if (waitpid(ev.data.fd)) {
-                // process closed
-                return;
+            switch (waitpid(ev.data.fd, false)) {
+                .noop => {},
+                .exited, .nopid => return,
             }
         }
     }
