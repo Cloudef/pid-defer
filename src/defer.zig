@@ -7,9 +7,9 @@ var CHILD: ?std.process.Child.Id = null;
 fn cleanupChild() void {
     if (CHILD) |chld| {
         CHILD = null;
-        const signals = .{ std.os.SIG.TERM, std.os.SIG.KILL };
+        const signals = .{ std.posix.SIG.TERM, std.posix.SIG.KILL };
         inline for (signals) |sig| {
-            std.os.kill(chld, sig) catch return;
+            std.posix.kill(chld, sig) catch return;
             // TODO: custom timeout
             for (1..5) |_| {
                 if (waitpid(chld, false) == .nopid) return;
@@ -21,7 +21,7 @@ fn cleanupChild() void {
 
 fn signalHandler(signal: c_int) anyerror!void {
     cleanupChild();
-    std.os.exit(@truncate(@as(c_uint, @bitCast(signal))));
+    std.posix.exit(@truncate(@as(c_uint, @bitCast(signal))));
 }
 
 pub fn main() !void {
@@ -33,20 +33,20 @@ pub fn main() !void {
         return error.InvalidUsage;
     }
 
-    if (try std.os.fork() > 0) {
+    if (try std.posix.fork() > 0) {
         // parent process
         return;
     }
 
-    const ppid = try std.fmt.parseInt(std.os.pid_t, args[1], 10);
-    const ppid_fd: std.os.pid_t = @bitCast(@as(u32, @truncate(std.os.linux.pidfd_open(ppid, 0))));
+    const ppid = try std.fmt.parseInt(std.posix.pid_t, args[1], 10);
+    const ppid_fd: std.posix.pid_t = @bitCast(@as(u32, @truncate(std.os.linux.pidfd_open(ppid, 0))));
     if (ppid_fd == -1) return error.PidfdOpenFailed;
-    defer std.os.close(ppid_fd);
+    defer std.posix.close(ppid_fd);
 
     {
-        const signals = .{std.os.SIG.TERM, std.os.SIG.INT, std.os.SIG.QUIT, std.os.SIG.HUP};
+        const signals = .{ std.posix.SIG.TERM, std.posix.SIG.INT, std.posix.SIG.QUIT, std.posix.SIG.HUP };
         var act = sigact(signalHandler);
-        inline for (signals) |sig| try std.os.sigaction(sig, &act, null);
+        inline for (signals) |sig| try std.posix.sigaction(sig, &act, null);
     }
 
     var chld = std.process.Child.init(args[2..], allocator);
@@ -54,18 +54,18 @@ pub fn main() !void {
     CHILD = chld.id;
     defer cleanupChild();
 
-    const child_fd: std.os.pid_t = @bitCast(@as(u32, @truncate(std.os.linux.pidfd_open(chld.id, 0))));
+    const child_fd: std.posix.pid_t = @bitCast(@as(u32, @truncate(std.os.linux.pidfd_open(chld.id, 0))));
     if (child_fd == -1) return error.PidfdOpenFailed;
-    defer std.os.close(child_fd);
+    defer std.posix.close(child_fd);
 
-    const efd = try std.os.epoll_create1(std.os.linux.EPOLL.CLOEXEC);
-    defer std.os.close(efd);
+    const efd = try std.posix.epoll_create1(std.os.linux.EPOLL.CLOEXEC);
+    defer std.posix.close(efd);
 
     const fds = .{ ppid_fd, child_fd };
     const pids = .{ ppid, chld.id };
     inline for (fds, pids) |fd, pid| {
         var ev: std.os.linux.epoll_event = .{ .events = std.os.linux.EPOLL.IN, .data = .{ .fd = pid } };
-        try std.os.epoll_ctl(efd, std.os.linux.EPOLL.CTL_ADD, fd, &ev);
+        try std.posix.epoll_ctl(efd, std.os.linux.EPOLL.CTL_ADD, fd, &ev);
     }
 
     var events: [2]std.os.linux.epoll_event = undefined;

@@ -10,15 +10,15 @@ pub fn main() !void {
         return error.InvalidUsage;
     }
 
-    const pid = try std.fmt.parseInt(std.os.pid_t, args[1], 10);
-    const pid_fd: std.os.pid_t = @bitCast(@as(u32, @truncate(std.os.linux.pidfd_open(pid, 0))));
+    const pid = try std.fmt.parseInt(std.posix.pid_t, args[1], 10);
+    const pid_fd: std.posix.pid_t = @bitCast(@as(u32, @truncate(std.os.linux.pidfd_open(pid, 0))));
     if (pid_fd == -1) return error.PidfdOpenFailed;
-    defer std.os.close(pid_fd);
+    defer std.posix.close(pid_fd);
 
-    const efd = try std.os.epoll_create1(std.os.linux.EPOLL.CLOEXEC);
-    defer std.os.close(efd);
+    const efd = try std.posix.epoll_create1(std.os.linux.EPOLL.CLOEXEC);
+    defer std.posix.close(efd);
     var iev: std.os.linux.epoll_event = .{ .events = std.os.linux.EPOLL.IN, .data = .{ .fd = pid } };
-    try std.os.epoll_ctl(efd, std.os.linux.EPOLL.CTL_ADD, pid_fd, &iev);
+    try std.posix.epoll_ctl(efd, std.os.linux.EPOLL.CTL_ADD, pid_fd, &iev);
 
     var events: [1]std.os.linux.epoll_event = undefined;
     var nevents: usize = 0;

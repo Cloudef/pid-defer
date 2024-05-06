@@ -1,6 +1,6 @@
 const std = @import("std");
 
-pub const WaitPidResult = union (enum) {
+pub const WaitPidResult = union(enum) {
     // no state change
     noop: void,
     // given child with the pid does not exist or all children are dead
@@ -14,8 +14,8 @@ pub const WaitPidResult = union (enum) {
 pub fn waitpid(pid: std.process.Child.Id, blocking: bool) WaitPidResult {
     again: {
         var status: u32 = undefined;
-        const ret = std.os.system.waitpid(pid, &status, if (blocking) 0 else std.os.system.W.NOHANG);
-        switch (std.os.errno(ret)) {
+        const ret = std.posix.system.waitpid(pid, &status, if (blocking) 0 else std.posix.W.NOHANG);
+        switch (std.posix.errno(ret)) {
             .SUCCESS => {},
             .CHILD => return .nopid,
             .INTR => break :again,
@@ -33,7 +33,7 @@ pub fn waitpid(pid: std.process.Child.Id, blocking: bool) WaitPidResult {
     return .noop;
 }
 
-pub fn sigact(comptime handler: fn (c_int) anyerror!void) std.os.Sigaction {
+pub fn sigact(comptime handler: fn (c_int) anyerror!void) std.posix.Sigaction {
     const wrapper = struct {
         fn fun(sig: c_int) callconv(.C) void {
             handler(sig) catch |err| {
@@ -44,7 +44,7 @@ pub fn sigact(comptime handler: fn (c_int) anyerror!void) std.os.Sigaction {
     };
     return .{
         .handler = .{ .handler = wrapper.fun },
-        .mask = std.os.empty_sigset,
+        .mask = std.posix.empty_sigset,
         .flags = 0,
     };
 }

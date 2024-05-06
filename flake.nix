@@ -1,67 +1,48 @@
 {
-  description = "zig-fsm-compiler flake";
+  description = "pid-defer flake";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs";
     flake-utils.url = "github:numtide/flake-utils";
-    zig-stdenv.url = "github:Cloudef/nix-zig-stdenv";
+    zig2nix.url = "github:Cloudef/zig2nix";
   };
 
-  outputs = { flake-utils, nixpkgs, zig-stdenv, ... }:
-  (flake-utils.lib.eachDefaultSystem (system:
-    let
-      pkgs = nixpkgs.outputs.legacyPackages."${system}";
-      zig = zig-stdenv.versions.${system}.master;
-      app = deps: script: {
-        type = "app";
-        program = toString (pkgs.writeShellApplication {
-          name = "app";
-          runtimeInputs = [ zig ] ++ deps;
-          text = ''
-            # shellcheck disable=SC2059
-            error() { printf -- "error: $1" "''${@:1}" 1>&2; exit 1; }
-            [[ -f ./flake.nix ]] || error 'Run this from the project root'
-            export ZIG_BTRFS_WORKAROUND=1
-            ${script}
-            '';
-        }) + "/bin/app";
-      };
-
-      defer = pkgs.stdenvNoCC.mkDerivation {
-        name = "defer";
-        version = "1.0.0";
-        src = ./.;
-        nativeBuildInputs = [ pkgs.zig.hook ];
-      };
-    in {
+  outputs = { flake-utils, zig2nix, ... }:
+  (flake-utils.lib.eachDefaultSystem (system: let
+      env = zig2nix.outputs.zig-env.${system} {};
+      system-triple = env.lib.zigTripleFromString system;
+    in with builtins; with env.lib; with env.pkgs.lib; {
       # package
-      packages.default = defer;
+      packages.default = env.packageForTarget system-triple {
+        pname = "pid-defer";
+        version = "1.0.0";
+        src = cleanSource ./.;
+      };
 
       # nix run .#defer
-      apps.defer = app [] "zig build run-defer -- \"$@\"";
+      apps.defer = env.app [] "zig build run-defer -- \"$@\"";
 
       # nix run .#reaper
-      apps.reaper = app [] "zig build run-reaper -- \"$@\"";
+      apps.reaper = env.app [] "zig build run-reaper -- \"$@\"";
 
       # nix run .#waitpid
-      apps.waitpid = app [] "zig build run-waitpid -- \"$@\"";
+      apps.waitpid = env.app [] "zig build run-waitpid -- \"$@\"";
 
       # nix run .#test-defer
-      apps.test-defer = app [] ''
+      apps.test-defer = env.app [] ''
         zig build
         ./zig-out/bin/defer $$ watch -t -x echo "this is gonna go away in 5 seconds (hopefully)"
         sleep 5
       '';
 
       # nix run .#test-reaper
-      apps.test-reaper = app [pkgs.daemonize] ''
+      apps.test-reaper = env.app [env.pkgs.daemonize] ''
         zig build
         ./zig-out/bin/defer $$ ./zig-out/bin/reaper daemonize -o /dev/stdout "$(which watch)" -t -x echo "this is gonna go away in 5 seconds (hopefully)"
         sleep 5
       '';
 
       # nix run .#test-waitpid
-      apps.test-waitpid = app [] ''
+      apps.test-waitpid = env.app [] ''
         zig build
         echo "sleeping for 5 secs now"
         sleep 5 &
@@ -70,12 +51,12 @@
       '';
 
       # nix run .#version
-      apps.version = app [] "zig version";
+      apps.version = env.app [] "zig version";
 
       # nix run .#readme
       apps.readme = let
         project = "pid-defer";
-      in with pkgs; app [graphviz] (builtins.replaceStrings ["`"] ["\\`"] ''
+      in env.app [] (replaceStrings ["`"] ["\\`"] ''
       cat <<EOF
       # ${project}
 
@@ -131,9 +112,6 @@
       '');
 
       # nix develop
-      devShells.default = pkgs.mkShell {
-        buildInputs = [ zig ];
-        shellHook = "export ZIG_BTRFS_WORKAROUND=1";
-      };
+      devShells.default = env.mkShell {};
     }));
 }
