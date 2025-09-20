@@ -12,13 +12,13 @@ pub const WaitPidResult = union(enum) {
 };
 
 pub fn waitpid(pid: std.process.Child.Id, blocking: bool) WaitPidResult {
-    again: {
+    while (true) {
         var status: u32 = undefined;
         const ret = std.posix.system.waitpid(pid, &status, if (blocking) 0 else std.posix.W.NOHANG);
         switch (std.posix.errno(ret)) {
             .SUCCESS => {},
             .CHILD => return .nopid,
-            .INTR => break :again,
+            .INTR => continue,
             .INVAL => unreachable,
             else => {},
         }
@@ -29,6 +29,7 @@ pub fn waitpid(pid: std.process.Child.Id, blocking: bool) WaitPidResult {
             }
             return .{ .alive = rpid };
         }
+        break;
     }
     return .noop;
 }

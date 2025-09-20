@@ -21,7 +21,7 @@ fn killChildren(ttid: std.posix.pid_t, signal: u8) !usize {
 fn cleanupChildren() !void {
     const ttid = std.os.linux.gettid();
     var signal: u8 = std.posix.SIG.TERM;
-    again: {
+    while (true) {
         // TODO: custom timeout
         for (1..5) |_| {
             if (try killChildren(ttid, signal) == 0) {
@@ -35,7 +35,6 @@ fn cleanupChildren() !void {
             std.time.sleep(1e+9);
         }
         signal = std.posix.SIG.KILL;
-        break :again;
     }
 }
 
