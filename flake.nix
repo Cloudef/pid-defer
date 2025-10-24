@@ -11,10 +11,9 @@
       env = zig2nix.outputs.zig-env.${system} {
         zig = zig2nix.outputs.packages.${system}.zig-0_12_0;
       };
-      system-triple = env.lib.zigTripleFromString system;
     in with builtins; with env.lib; with env.pkgs.lib; {
       # package
-      packages.default = env.packageForTarget system-triple {
+      packages.default = env.package {
         pname = "pid-defer";
         version = "1.0.0";
         src = cleanSource ./.;
